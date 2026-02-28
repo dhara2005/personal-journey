@@ -23,15 +23,12 @@
 
     // ---- Initialize Firebase ----
 
+    console.log('[Firebase] Initializing...');
     firebase.initializeApp(firebaseConfig);
 
     var auth = firebase.auth();
     var db = firebase.firestore();
-
-    // Enable offline persistence so Firestore works offline too
-    db.enablePersistence({ synchronizeTabs: true }).catch(function (err) {
-        console.warn('Firestore persistence unavailable:', err.code);
-    });
+    console.log('[Firebase] Initialized OK');
 
 
     // ---- DOM References ----
@@ -47,33 +44,34 @@
     // ---- Track current signed-in user ----
 
     var currentUID = null;
-    var unsubscribe = null; // Firestore listener cleanup
+    var unsubscribe = null;
 
 
     // ---- Sync Status Indicator ----
 
     function showSyncStatus(text, type) {
-        // type: 'success', 'error', 'loading'
+        if (!syncStatus) return;
         syncStatus.textContent = text;
         syncStatus.className = 'auth__sync-status sync-' + type;
-        syncStatus.style.display = 'inline';
+        syncStatus.style.display = 'block';
 
-        // Auto-hide success messages after 3s
         if (type === 'success') {
             setTimeout(function () {
-                syncStatus.style.display = 'none';
-            }, 3000);
+                if (syncStatus) syncStatus.style.display = 'none';
+            }, 4000);
         }
     }
 
     function hideSyncStatus() {
-        syncStatus.style.display = 'none';
+        if (syncStatus) syncStatus.style.display = 'none';
     }
 
 
     // ---- Auth State Listener ----
 
     auth.onAuthStateChanged(function (user) {
+        console.log('[Firebase] Auth state changed:', user ? user.email : 'signed out');
+
         if (user) {
             currentUID = user.uid;
             showSignedInUI(user);
@@ -84,7 +82,6 @@
             showSignedOutUI();
             stopCloudSync();
             hideSyncStatus();
-            // Reset to default empty state when signed out
             QuitApp.setState({
                 currentStreak: 0,
                 longestStreak: 0,
@@ -98,20 +95,24 @@
     // ---- Sign In / Sign Out ----
 
     function signInWithGoogle() {
+        console.log('[Firebase] Starting Google sign-in...');
         var provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch(function (error) {
-            console.error('Sign-in error:', error.code, error.message);
+        auth.signInWithPopup(provider).then(function (result) {
+            console.log('[Firebase] Sign-in successful:', result.user.email);
+        }).catch(function (error) {
+            console.error('[Firebase] Sign-in error:', error.code, error.message);
             if (error.code === 'auth/popup-blocked') {
                 auth.signInWithRedirect(provider);
-            } else {
+            } else if (error.code !== 'auth/popup-closed-by-user') {
                 showSyncStatus('Sign-in failed: ' + error.message, 'error');
             }
         });
     }
 
     function signOut() {
+        console.log('[Firebase] Signing out...');
         auth.signOut().catch(function (error) {
-            console.error('Sign-out error:', error);
+            console.error('[Firebase] Sign-out error:', error);
         });
     }
 
@@ -133,7 +134,6 @@
         var firstName = (user.displayName || 'You').split(' ')[0];
         userName.textContent = 'Welcome, ' + firstName;
         userName.style.display = 'block';
-
         authSection.classList.add('signed-in');
     }
 
@@ -148,17 +148,18 @@
 
     // ---- Cloud Data Loading ----
 
-    /**
-     * Load data from Firestore for this specific user.
-     * Each account is fully isolated — no localStorage merge.
-     * If cloud data exists, load it. Otherwise start fresh.
-     */
     function loadCloudData(uid) {
+        console.log('[Firebase] Loading cloud data for uid:', uid);
         var docRef = db.collection('users').doc(uid);
 
+        // Use get with source:'server' to force network fetch
+        // Fall back to cache if server unavailable
         docRef.get().then(function (doc) {
+            console.log('[Firebase] Firestore get() resolved. exists:', doc.exists, 'fromCache:', doc.metadata.fromCache);
+
             if (doc.exists) {
                 var cloudData = doc.data();
+                console.log('[Firebase] Cloud data:', JSON.stringify(cloudData));
                 QuitApp.setState({
                     currentStreak: cloudData.currentStreak || 0,
                     longestStreak: cloudData.longestStreak || 0,
@@ -167,27 +168,31 @@
                 });
                 showSyncStatus('✓ Synced', 'success');
             } else {
-                // Brand new account — start at zero and save to cloud
+                console.log('[Firebase] No cloud data found — fresh account');
                 var freshState = {
                     currentStreak: 0,
                     longestStreak: 0,
                     lastCheckIn: null,
                     focusMode: false
                 };
+                QuitApp.setState(freshState);
+                // Write fresh state to cloud
                 docRef.set(freshState).then(function () {
+                    console.log('[Firebase] Fresh state saved to cloud');
                     showSyncStatus('✓ Synced', 'success');
                 }).catch(function (error) {
-                    console.error('Cloud write failed:', error.code, error.message);
-                    showSyncStatus('✗ Sync failed — check Firestore rules', 'error');
+                    console.error('[Firebase] WRITE FAILED:', error.code, error.message);
+                    showSyncStatus('✗ Save failed: ' + error.code, 'error');
                 });
-                QuitApp.setState(freshState);
             }
 
-            // Now start real-time listener for ongoing changes from other devices
+            // Start real-time listener
             startRealtimeSync(uid);
+
         }).catch(function (error) {
-            console.error('Cloud read failed:', error.code, error.message);
-            showSyncStatus('✗ Sync failed — check Firestore rules', 'error');
+            console.error('[Firebase] READ FAILED:', error.code, error.message);
+            showSyncStatus('✗ Read failed: ' + error.code, 'error');
+            // Start listener anyway
             startRealtimeSync(uid);
         });
     }
@@ -195,18 +200,18 @@
 
     // ---- Real-time Sync ----
 
-    /**
-     * Listen for changes pushed from other devices.
-     */
     function startRealtimeSync(uid) {
         stopCloudSync();
-
         var docRef = db.collection('users').doc(uid);
 
+        console.log('[Firebase] Starting real-time listener for uid:', uid);
+
         unsubscribe = docRef.onSnapshot(function (doc) {
+            console.log('[Firebase] Snapshot received. exists:', doc.exists, 'fromCache:', doc.metadata.fromCache, 'hasPendingWrites:', doc.metadata.hasPendingWrites);
+
             if (doc.exists && doc.metadata.hasPendingWrites === false) {
-                // Only update from server-confirmed writes (ignore local echoes)
                 var cloudData = doc.data();
+                console.log('[Firebase] Applying cloud data:', JSON.stringify(cloudData));
                 QuitApp.setState({
                     currentStreak: cloudData.currentStreak || 0,
                     longestStreak: cloudData.longestStreak || 0,
@@ -215,8 +220,8 @@
                 });
             }
         }, function (error) {
-            console.error('Realtime listener error:', error.code, error.message);
-            showSyncStatus('✗ Sync lost — check connection', 'error');
+            console.error('[Firebase] Listener error:', error.code, error.message);
+            showSyncStatus('✗ Sync lost: ' + error.code, 'error');
         });
     }
 
@@ -230,24 +235,26 @@
 
     // ---- Push to Cloud ----
 
-    /**
-     * Push current state to Firestore.
-     * Called by app.js after check-in, relapse, or focus toggle.
-     */
     function syncToCloud() {
-        if (!currentUID) return;
+        if (!currentUID) {
+            console.log('[Firebase] syncToCloud skipped — not signed in');
+            return;
+        }
 
         var state = QuitApp.getState();
+        console.log('[Firebase] Writing to cloud:', JSON.stringify(state));
+
         db.collection('users').doc(currentUID).set({
             currentStreak: state.currentStreak,
             longestStreak: state.longestStreak,
             lastCheckIn: state.lastCheckIn,
             focusMode: state.focusMode
         }).then(function () {
+            console.log('[Firebase] Write successful');
             showSyncStatus('✓ Synced', 'success');
         }).catch(function (error) {
-            console.error('Cloud write failed:', error.code, error.message);
-            showSyncStatus('✗ Save failed — check Firestore rules', 'error');
+            console.error('[Firebase] WRITE FAILED:', error.code, error.message);
+            showSyncStatus('✗ Save failed: ' + error.code, 'error');
         });
     }
 
@@ -258,10 +265,12 @@
     signOutBtn.addEventListener('click', signOut);
 
 
-    // ---- Expose sync function globally for app.js to call ----
+    // ---- Expose sync function globally ----
 
     window.FirebaseSync = {
         syncToCloud: syncToCloud
     };
+
+    console.log('[Firebase] Sync module loaded');
 
 })();
