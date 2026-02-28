@@ -4,7 +4,7 @@
    Data is persisted in localStorage.
    ============================================================ */
 
-(function () {
+var QuitApp = (function () {
   'use strict';
 
   // ---- Constants ----
@@ -168,6 +168,7 @@
     }
 
     saveState();
+    syncToCloud();
     renderAll();
     showEncouragement();
     pulseStreak();
@@ -181,6 +182,7 @@
     state.currentStreak = 0;
     state.lastCheckIn = null;
     saveState();
+    syncToCloud();
     renderAll();
     showRelapseMessage();
   }
@@ -267,6 +269,7 @@
   function toggleFocusMode() {
     state.focusMode = !state.focusMode;
     saveState();
+    syncToCloud();
     renderFocusMode();
   }
 
@@ -321,6 +324,18 @@
   });
 
 
+  // ---- Cloud Sync Helper ----
+
+  /**
+   * Push state to cloud if Firebase is loaded and user is signed in.
+   */
+  function syncToCloud() {
+    if (window.FirebaseSync && typeof window.FirebaseSync.syncToCloud === 'function') {
+      window.FirebaseSync.syncToCloud();
+    }
+  }
+
+
   // ---- Initialise ----
 
   detectStreakBreak();
@@ -330,5 +345,28 @@
   if (isToday(state.lastCheckIn)) {
     showEncouragement();
   }
+
+
+  // ---- Public API (used by firebase-sync.js) ----
+
+  return {
+    getState: function () {
+      return {
+        currentStreak: state.currentStreak,
+        longestStreak: state.longestStreak,
+        lastCheckIn: state.lastCheckIn,
+        focusMode: state.focusMode
+      };
+    },
+    setState: function (newState) {
+      state.currentStreak = newState.currentStreak !== undefined ? newState.currentStreak : state.currentStreak;
+      state.longestStreak = newState.longestStreak !== undefined ? newState.longestStreak : state.longestStreak;
+      state.lastCheckIn = newState.lastCheckIn !== undefined ? newState.lastCheckIn : state.lastCheckIn;
+      state.focusMode = newState.focusMode !== undefined ? newState.focusMode : state.focusMode;
+      saveState();
+      renderAll();
+    },
+    renderAll: renderAll
+  };
 
 })();

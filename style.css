@@ -246,6 +246,131 @@ body::after {
 }
 
 
+/* ---------- Auth Section ---------- */
+.auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  animation: fadeInUp 0.6s var(--ease) 0.05s both;
+}
+
+.auth__user {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.auth__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--clr-glass-border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.auth__name {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--clr-text-muted);
+}
+
+/* Sign-in button */
+.btn--sign-in {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--clr-text-muted);
+  background: var(--clr-glass);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--clr-glass-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-family: var(--ff);
+  transition: all var(--dur) var(--ease);
+  width: auto;
+  min-height: 36px;
+}
+
+.btn--sign-in:hover {
+  background: var(--clr-glass-hover);
+  border-color: rgba(42, 157, 120, 0.2);
+  color: var(--clr-primary);
+  transform: translateY(-1px);
+}
+
+.btn--sign-in::after {
+  display: none;
+}
+
+.google-icon {
+  flex-shrink: 0;
+}
+
+/* Sign-out button */
+.btn--sign-out {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--clr-text-faint);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-family: var(--ff);
+  transition: all var(--dur) var(--ease);
+  width: auto;
+  min-height: 28px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.btn--sign-out:hover {
+  color: var(--clr-danger);
+}
+
+.btn--sign-out::after {
+  display: none;
+}
+
+/* Auth in signed-in state */
+.auth.signed-in {
+  justify-content: center;
+}
+
+/* Focus mode auth styles */
+body.focus-mode .auth__name {
+  color: var(--clr-focus-text-muted);
+}
+
+body.focus-mode .auth__avatar {
+  border-color: var(--clr-focus-glass-border);
+}
+
+body.focus-mode .btn--sign-in {
+  background: var(--clr-focus-glass);
+  border-color: var(--clr-focus-glass-border);
+  color: var(--clr-focus-text-muted);
+}
+
+body.focus-mode .btn--sign-in:hover {
+  color: var(--clr-accent);
+  border-color: rgba(228, 185, 74, 0.3);
+}
+
+body.focus-mode .btn--sign-out {
+  color: var(--clr-focus-text-muted);
+}
+
+
 /* ---------- Motivation Section ---------- */
 .motivation {
   text-align: center;
