@@ -2,6 +2,7 @@
    Quit Addiction — Firebase Sync Module
    Handles Google sign-in and Firestore cloud sync.
    Each Google account has its own isolated streak data.
+   Uses redirect flow on mobile for reliable auth.
    Loaded AFTER app.js so it can access QuitApp global.
    ============================================================ */
 
@@ -23,12 +24,12 @@
 
     // ---- Initialize Firebase ----
 
-    console.log('[Firebase] Initializing...');
+    console.log('[Sync] Initializing Firebase...');
     firebase.initializeApp(firebaseConfig);
 
     var auth = firebase.auth();
     var db = firebase.firestore();
-    console.log('[Firebase] Initialized OK');
+    console.log('[Sync] Firebase initialized');
 
 
     // ---- DOM References ----
@@ -41,20 +42,26 @@
     var syncStatus = document.getElementById('syncStatus');
 
 
-    // ---- Track current signed-in user ----
+    // ---- State ----
 
     var currentUID = null;
     var unsubscribe = null;
 
 
-    // ---- Sync Status Indicator ----
+    // ---- Detect mobile ----
 
-    function showSyncStatus(text, type) {
+    function isMobile() {
+        return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+
+    // ---- Sync Status ----
+
+    function showStatus(text, type) {
         if (!syncStatus) return;
         syncStatus.textContent = text;
         syncStatus.className = 'auth__sync-status sync-' + type;
         syncStatus.style.display = 'block';
-
         if (type === 'success') {
             setTimeout(function () {
                 if (syncStatus) syncStatus.style.display = 'none';
@@ -62,26 +69,30 @@
         }
     }
 
-    function hideSyncStatus() {
-        if (syncStatus) syncStatus.style.display = 'none';
-    }
 
+    // ---- Auth ----
 
-    // ---- Auth State Listener ----
+    // Check for redirect result on page load (for mobile flow)
+    auth.getRedirectResult().then(function (result) {
+        if (result.user) {
+            console.log('[Sync] Redirect sign-in success:', result.user.email);
+        }
+    }).catch(function (error) {
+        console.error('[Sync] Redirect error:', error.code, error.message);
+        showStatus('Sign-in error: ' + error.code, 'error');
+    });
 
     auth.onAuthStateChanged(function (user) {
-        console.log('[Firebase] Auth state changed:', user ? user.email : 'signed out');
-
+        console.log('[Sync] Auth changed:', user ? user.email : 'signed out');
         if (user) {
             currentUID = user.uid;
             showSignedInUI(user);
-            showSyncStatus('Syncing...', 'loading');
+            showStatus('Syncing...', 'loading');
             loadCloudData(user.uid);
         } else {
             currentUID = null;
             showSignedOutUI();
-            stopCloudSync();
-            hideSyncStatus();
+            stopSync();
             QuitApp.setState({
                 currentStreak: 0,
                 longestStreak: 0,
@@ -91,48 +102,48 @@
         }
     });
 
-
-    // ---- Sign In / Sign Out ----
-
-    function signInWithGoogle() {
-        console.log('[Firebase] Starting Google sign-in...');
+    function signIn() {
+        console.log('[Sync] Starting sign-in, mobile:', isMobile());
         var provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).then(function (result) {
-            console.log('[Firebase] Sign-in successful:', result.user.email);
-        }).catch(function (error) {
-            console.error('[Firebase] Sign-in error:', error.code, error.message);
-            if (error.code === 'auth/popup-blocked') {
-                auth.signInWithRedirect(provider);
-            } else if (error.code !== 'auth/popup-closed-by-user') {
-                showSyncStatus('Sign-in failed: ' + error.message, 'error');
-            }
-        });
+
+        if (isMobile()) {
+            // Redirect flow — more reliable on mobile browsers
+            auth.signInWithRedirect(provider);
+        } else {
+            // Popup flow on desktop
+            auth.signInWithPopup(provider).then(function (result) {
+                console.log('[Sync] Popup sign-in success:', result.user.email);
+            }).catch(function (error) {
+                console.error('[Sync] Popup error:', error.code, error.message);
+                if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+                    // Fall back to redirect
+                    auth.signInWithRedirect(provider);
+                } else {
+                    showStatus('Sign-in failed: ' + error.code, 'error');
+                }
+            });
+        }
     }
 
     function signOut() {
-        console.log('[Firebase] Signing out...');
-        auth.signOut().catch(function (error) {
-            console.error('[Firebase] Sign-out error:', error);
-        });
+        auth.signOut();
     }
 
 
-    // ---- UI Updates ----
+    // ---- UI ----
 
     function showSignedInUI(user) {
         signInBtn.style.display = 'none';
         signOutBtn.style.display = 'inline-flex';
-
         if (user.photoURL) {
             userAvatar.src = user.photoURL;
-            userAvatar.alt = user.displayName || 'User';
+            userAvatar.alt = user.displayName || '';
             userAvatar.style.display = 'block';
         } else {
             userAvatar.style.display = 'none';
         }
-
-        var firstName = (user.displayName || 'You').split(' ')[0];
-        userName.textContent = 'Welcome, ' + firstName;
+        var name = (user.displayName || 'You').split(' ')[0];
+        userName.textContent = 'Hi, ' + name;
         userName.style.display = 'block';
         authSection.classList.add('signed-in');
     }
@@ -143,134 +154,105 @@
         userAvatar.style.display = 'none';
         userName.style.display = 'none';
         authSection.classList.remove('signed-in');
+        showStatus('', 'hidden');
+        if (syncStatus) syncStatus.style.display = 'none';
     }
 
 
-    // ---- Cloud Data Loading ----
+    // ---- Firestore Sync ----
 
     function loadCloudData(uid) {
-        console.log('[Firebase] Loading cloud data for uid:', uid);
+        console.log('[Sync] Loading data for:', uid);
         var docRef = db.collection('users').doc(uid);
 
-        // Use get with source:'server' to force network fetch
-        // Fall back to cache if server unavailable
         docRef.get().then(function (doc) {
-            console.log('[Firebase] Firestore get() resolved. exists:', doc.exists, 'fromCache:', doc.metadata.fromCache);
+            console.log('[Sync] Got doc. exists:', doc.exists, 'cache:', doc.metadata.fromCache);
 
             if (doc.exists) {
-                var cloudData = doc.data();
-                console.log('[Firebase] Cloud data:', JSON.stringify(cloudData));
+                var d = doc.data();
+                console.log('[Sync] Data:', JSON.stringify(d));
                 QuitApp.setState({
-                    currentStreak: cloudData.currentStreak || 0,
-                    longestStreak: cloudData.longestStreak || 0,
-                    lastCheckIn: cloudData.lastCheckIn || null,
-                    focusMode: cloudData.focusMode || false
+                    currentStreak: d.currentStreak || 0,
+                    longestStreak: d.longestStreak || 0,
+                    lastCheckIn: d.lastCheckIn || null,
+                    focusMode: d.focusMode || false
                 });
-                showSyncStatus('✓ Synced', 'success');
+                showStatus('✓ Synced', 'success');
             } else {
-                console.log('[Firebase] No cloud data found — fresh account');
-                var freshState = {
-                    currentStreak: 0,
-                    longestStreak: 0,
-                    lastCheckIn: null,
-                    focusMode: false
-                };
-                QuitApp.setState(freshState);
-                // Write fresh state to cloud
-                docRef.set(freshState).then(function () {
-                    console.log('[Firebase] Fresh state saved to cloud');
-                    showSyncStatus('✓ Synced', 'success');
-                }).catch(function (error) {
-                    console.error('[Firebase] WRITE FAILED:', error.code, error.message);
-                    showSyncStatus('✗ Save failed: ' + error.code, 'error');
+                console.log('[Sync] New account — creating doc');
+                var fresh = { currentStreak: 0, longestStreak: 0, lastCheckIn: null, focusMode: false };
+                QuitApp.setState(fresh);
+                docRef.set(fresh).then(function () {
+                    console.log('[Sync] Created new doc');
+                    showStatus('✓ Synced', 'success');
+                }).catch(function (err) {
+                    console.error('[Sync] CREATE FAILED:', err.code, err.message);
+                    showStatus('✗ Failed: ' + err.code, 'error');
                 });
             }
 
-            // Start real-time listener
-            startRealtimeSync(uid);
-
-        }).catch(function (error) {
-            console.error('[Firebase] READ FAILED:', error.code, error.message);
-            showSyncStatus('✗ Read failed: ' + error.code, 'error');
-            // Start listener anyway
-            startRealtimeSync(uid);
+            startListener(uid);
+        }).catch(function (err) {
+            console.error('[Sync] READ FAILED:', err.code, err.message);
+            showStatus('✗ Failed: ' + err.code, 'error');
+            startListener(uid);
         });
     }
 
+    function startListener(uid) {
+        stopSync();
+        console.log('[Sync] Starting listener for:', uid);
 
-    // ---- Real-time Sync ----
-
-    function startRealtimeSync(uid) {
-        stopCloudSync();
-        var docRef = db.collection('users').doc(uid);
-
-        console.log('[Firebase] Starting real-time listener for uid:', uid);
-
-        unsubscribe = docRef.onSnapshot(function (doc) {
-            console.log('[Firebase] Snapshot received. exists:', doc.exists, 'fromCache:', doc.metadata.fromCache, 'hasPendingWrites:', doc.metadata.hasPendingWrites);
-
-            if (doc.exists && doc.metadata.hasPendingWrites === false) {
-                var cloudData = doc.data();
-                console.log('[Firebase] Applying cloud data:', JSON.stringify(cloudData));
+        unsubscribe = db.collection('users').doc(uid).onSnapshot(function (doc) {
+            if (doc.exists && !doc.metadata.hasPendingWrites) {
+                var d = doc.data();
+                console.log('[Sync] Live update:', JSON.stringify(d));
                 QuitApp.setState({
-                    currentStreak: cloudData.currentStreak || 0,
-                    longestStreak: cloudData.longestStreak || 0,
-                    lastCheckIn: cloudData.lastCheckIn || null,
-                    focusMode: cloudData.focusMode !== undefined ? cloudData.focusMode : false
+                    currentStreak: d.currentStreak || 0,
+                    longestStreak: d.longestStreak || 0,
+                    lastCheckIn: d.lastCheckIn || null,
+                    focusMode: d.focusMode !== undefined ? d.focusMode : false
                 });
             }
-        }, function (error) {
-            console.error('[Firebase] Listener error:', error.code, error.message);
-            showSyncStatus('✗ Sync lost: ' + error.code, 'error');
+        }, function (err) {
+            console.error('[Sync] LISTENER ERROR:', err.code, err.message);
+            showStatus('✗ Sync lost: ' + err.code, 'error');
         });
     }
 
-    function stopCloudSync() {
-        if (unsubscribe) {
-            unsubscribe();
-            unsubscribe = null;
-        }
+    function stopSync() {
+        if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     }
-
-
-    // ---- Push to Cloud ----
 
     function syncToCloud() {
-        if (!currentUID) {
-            console.log('[Firebase] syncToCloud skipped — not signed in');
-            return;
-        }
-
-        var state = QuitApp.getState();
-        console.log('[Firebase] Writing to cloud:', JSON.stringify(state));
+        if (!currentUID) return;
+        var s = QuitApp.getState();
+        console.log('[Sync] Writing:', JSON.stringify(s));
 
         db.collection('users').doc(currentUID).set({
-            currentStreak: state.currentStreak,
-            longestStreak: state.longestStreak,
-            lastCheckIn: state.lastCheckIn,
-            focusMode: state.focusMode
+            currentStreak: s.currentStreak,
+            longestStreak: s.longestStreak,
+            lastCheckIn: s.lastCheckIn,
+            focusMode: s.focusMode
         }).then(function () {
-            console.log('[Firebase] Write successful');
-            showSyncStatus('✓ Synced', 'success');
-        }).catch(function (error) {
-            console.error('[Firebase] WRITE FAILED:', error.code, error.message);
-            showSyncStatus('✗ Save failed: ' + error.code, 'error');
+            console.log('[Sync] Write OK');
+            showStatus('✓ Synced', 'success');
+        }).catch(function (err) {
+            console.error('[Sync] WRITE FAILED:', err.code, err.message);
+            showStatus('✗ Save failed: ' + err.code, 'error');
         });
     }
 
 
-    // ---- Event Listeners ----
+    // ---- Events ----
 
-    signInBtn.addEventListener('click', signInWithGoogle);
+    signInBtn.addEventListener('click', signIn);
     signOutBtn.addEventListener('click', signOut);
 
 
-    // ---- Expose sync function globally ----
+    // ---- Public API ----
 
-    window.FirebaseSync = {
-        syncToCloud: syncToCloud
-    };
-
-    console.log('[Firebase] Sync module loaded');
+    window.FirebaseSync = { syncToCloud: syncToCloud };
+    console.log('[Sync] Module ready');
 
 })();

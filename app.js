@@ -55,6 +55,7 @@ var QuitApp = (function () {
     relapseModal: document.getElementById('relapseModal'),
     modalCancel: document.getElementById('modalCancel'),
     modalConfirm: document.getElementById('modalConfirm'),
+    themeToggle: document.getElementById('themeToggle'),
   };
 
 
@@ -276,12 +277,40 @@ var QuitApp = (function () {
   function renderFocusMode() {
     if (state.focusMode) {
       document.body.classList.add('focus-mode');
-      dom.focusIcon.textContent = '☀️';
+      dom.focusIcon.textContent = '🧘';
       dom.focusModeLabel.textContent = 'Exit Focus Mode';
     } else {
       document.body.classList.remove('focus-mode');
-      dom.focusIcon.textContent = '🌙';
+      dom.focusIcon.textContent = '🧘';
       dom.focusModeLabel.textContent = 'Focus Mode';
+    }
+  }
+
+
+  // ---- Dark / Light Theme ----
+
+  function initTheme() {
+    var saved = localStorage.getItem('quitAddictionTheme');
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+    updateThemeIcon();
+  }
+
+  function toggleTheme() {
+    var current = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('quitAddictionTheme', next);
+    updateThemeIcon();
+  }
+
+  function updateThemeIcon() {
+    var theme = document.documentElement.getAttribute('data-theme') || 'light';
+    if (dom.themeToggle) {
+      dom.themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
     }
   }
 
@@ -302,6 +331,7 @@ var QuitApp = (function () {
   dom.checkInBtn.addEventListener('click', checkIn);
   dom.relapseBtn.addEventListener('click', openRelapseModal);
   dom.focusModeBtn.addEventListener('click', toggleFocusMode);
+  if (dom.themeToggle) dom.themeToggle.addEventListener('click', toggleTheme);
   dom.modalCancel.addEventListener('click', closeRelapseModal);
 
   dom.modalConfirm.addEventListener('click', function () {
@@ -338,6 +368,7 @@ var QuitApp = (function () {
 
   // ---- Initialise ----
 
+  initTheme();
   detectStreakBreak();
   renderAll();
 

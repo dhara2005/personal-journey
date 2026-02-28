@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description"
     content="Quit Addiction — A calming daily streak tracker to help you stay strong, one day at a time." />
-  <meta name="theme-color" content="#1a6b54" />
+  <meta name="theme-color" content="#2d8b70" />
   <title>Quit Addiction — Stay Strong</title>
+  <link rel="icon" type="image/png" href="logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -16,21 +17,30 @@
 
 <body>
 
-  <!-- ===== Daily Progress Bar (top edge) ===== -->
+  <!-- ===== Progress Bar ===== -->
   <div class="progress-bar-track" id="progressTrack">
     <div class="progress-bar-fill" id="progressFill"></div>
   </div>
 
   <main class="container" id="appContainer">
 
-    <!-- ===== Auth Section (Sign-in / User info) ===== -->
+    <!-- ===== Header with Logo + Theme Toggle ===== -->
+    <header class="header">
+      <div class="header__brand">
+        <img class="header__logo" src="logo.png" alt="Quit Addiction" />
+        <h2 class="header__title">Quit <span>Addiction</span></h2>
+      </div>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">🌙</button>
+    </header>
+
+    <!-- ===== Auth Section ===== -->
     <section class="auth" id="authSection">
       <div class="auth__user">
         <img class="auth__avatar" id="userAvatar" src="" alt="" style="display:none;" />
         <span class="auth__name" id="userName" style="display:none;"></span>
       </div>
       <button class="btn btn--sign-in" id="signInBtn">
-        <svg class="google-icon" viewBox="0 0 24 24" width="18" height="18">
+        <svg class="google-icon" viewBox="0 0 24 24" width="16" height="16">
           <path fill="#4285F4"
             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
           <path fill="#34A853"
@@ -42,13 +52,11 @@
         </svg>
         Sign in to sync
       </button>
-      <button class="btn btn--sign-out" id="signOutBtn" style="display:none;">
-        Sign out
-      </button>
+      <button class="btn btn--sign-out" id="signOutBtn" style="display:none;">Sign out</button>
       <span class="auth__sync-status" id="syncStatus" style="display:none;"></span>
     </section>
 
-    <!-- ===== Motivation Section ===== -->
+    <!-- ===== Motivation ===== -->
     <section class="motivation" id="motivationSection">
       <h1 class="motivation__title">Why I'm Doing This</h1>
       <ul class="motivation__list">
@@ -59,7 +67,7 @@
       </ul>
     </section>
 
-    <!-- ===== Streak Display ===== -->
+    <!-- ===== Streak ===== -->
     <section class="streak" id="streakSection">
       <div class="streak__current">
         <span class="streak__number" id="currentStreak">0</span>
@@ -77,33 +85,31 @@
       </div>
     </section>
 
-    <!-- ===== Encouragement Message ===== -->
+    <!-- ===== Encouragement ===== -->
     <section class="encouragement" id="encouragementSection">
       <p class="encouragement__text" id="encouragementText"></p>
     </section>
 
-    <!-- ===== Action Buttons ===== -->
+    <!-- ===== Actions ===== -->
     <section class="actions" id="actionsSection">
       <button class="btn btn--primary" id="checkInBtn">
         <span class="btn__icon">✦</span>
         I Stayed Strong Today
       </button>
-      <button class="btn btn--secondary" id="relapseBtn">
-        I Slipped
-      </button>
+      <button class="btn btn--secondary" id="relapseBtn">I Slipped</button>
     </section>
 
-    <!-- ===== Focus Mode Toggle ===== -->
+    <!-- ===== Focus Mode ===== -->
     <section class="focus-toggle" id="focusToggleSection">
       <button class="btn btn--ghost" id="focusModeBtn">
-        <span class="focus-icon" id="focusIcon">🌙</span>
+        <span class="focus-icon" id="focusIcon">🧘</span>
         <span id="focusModeLabel">Focus Mode</span>
       </button>
     </section>
 
   </main>
 
-  <!-- ===== Relapse Confirmation Modal ===== -->
+  <!-- ===== Relapse Modal ===== -->
   <div class="modal-overlay" id="relapseModal">
     <div class="modal">
       <p class="modal__title">Are you sure?</p>
@@ -116,16 +122,11 @@
     </div>
   </div>
 
-  <!-- ===== Scripts ===== -->
-  <!-- App logic (no Firebase dependency) -->
+  <!-- Scripts -->
   <script src="app.js"></script>
-
-  <!-- Firebase SDK (compat version for plain JS, loaded via CDN) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-  <!-- Firebase sync (loaded after both app.js and Firebase SDK) -->
   <script src="firebase-sync.js"></script>
 </body>
 
