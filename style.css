@@ -869,7 +869,6 @@ body.focus-mode .modal__body {
 
 /* Hide non-essential sections in focus mode */
 body.focus-mode .encouragement,
-body.focus-mode .btn--secondary,
 body.focus-mode .streak__meta {
   display: none;
 }
