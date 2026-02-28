@@ -1,6 +1,7 @@
 /* ============================================================
    Quit Addiction — Firebase Sync Module
    Handles Google sign-in and Firestore cloud sync.
+   Each Google account has its own isolated streak data.
    Loaded AFTER app.js so it can access QuitApp global.
    ============================================================ */
 
@@ -9,7 +10,7 @@
 
     // ---- Firebase Config ----
 
-    const firebaseConfig = {
+    var firebaseConfig = {
         apiKey: "AIzaSyCtKj4LV8qoe7WBV-EHFLXbX70zrzX7otU",
         authDomain: "quit-addiction-b9825.firebaseapp.com",
         projectId: "quit-addiction-b9825",
@@ -24,8 +25,8 @@
 
     firebase.initializeApp(firebaseConfig);
 
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    var auth = firebase.auth();
+    var db = firebase.firestore();
 
     // Enable offline persistence so Firestore works offline too
     db.enablePersistence({ synchronizeTabs: true }).catch(function (err) {
@@ -35,24 +36,37 @@
 
     // ---- DOM References ----
 
-    const signInBtn = document.getElementById('signInBtn');
-    const signOutBtn = document.getElementById('signOutBtn');
-    const userAvatar = document.getElementById('userAvatar');
-    const userName = document.getElementById('userName');
-    const authSection = document.getElementById('authSection');
+    var signInBtn = document.getElementById('signInBtn');
+    var signOutBtn = document.getElementById('signOutBtn');
+    var userAvatar = document.getElementById('userAvatar');
+    var userName = document.getElementById('userName');
+    var authSection = document.getElementById('authSection');
+
+
+    // ---- Track current signed-in user ----
+
+    var currentUID = null;
+    var unsubscribe = null; // Firestore listener cleanup
 
 
     // ---- Auth State Listener ----
 
     auth.onAuthStateChanged(function (user) {
         if (user) {
-            // User is signed in
+            currentUID = user.uid;
             showSignedInUI(user);
-            startCloudSync(user.uid);
+            loadCloudData(user.uid);
         } else {
-            // User is signed out
+            currentUID = null;
             showSignedOutUI();
             stopCloudSync();
+            // Reset to default empty state when signed out
+            QuitApp.setState({
+                currentStreak: 0,
+                longestStreak: 0,
+                lastCheckIn: null,
+                focusMode: false
+            });
         }
     });
 
@@ -107,50 +121,63 @@
     }
 
 
-    // ---- Cloud Sync ----
-
-    var unsubscribe = null; // Firestore listener cleanup
+    // ---- Cloud Data Loading ----
 
     /**
-     * Start real-time sync with Firestore.
-     * On first sign-in, merge local data with cloud (keep higher values).
+     * Load data from Firestore for this specific user.
+     * Does NOT merge localStorage — each account is fully isolated.
+     * If no cloud data exists, start fresh with zeroes.
      */
-    function startCloudSync(uid) {
+    function loadCloudData(uid) {
         var docRef = db.collection('users').doc(uid);
 
-        // First, merge local data with cloud
         docRef.get().then(function (doc) {
-            var localState = QuitApp.getState();
-
             if (doc.exists) {
+                // Cloud data found — use it (overrides whatever is local)
                 var cloudData = doc.data();
-                // Merge: take the higher streak values
-                var merged = {
-                    currentStreak: Math.max(localState.currentStreak || 0, cloudData.currentStreak || 0),
-                    longestStreak: Math.max(localState.longestStreak || 0, cloudData.longestStreak || 0),
-                    lastCheckIn: pickLatestDate(localState.lastCheckIn, cloudData.lastCheckIn),
-                    focusMode: localState.focusMode
-                };
-                // Update cloud with merged data
-                docRef.set(merged, { merge: true });
-                // Update local
-                QuitApp.setState(merged);
-            } else {
-                // No cloud data — push local data up
-                docRef.set({
-                    currentStreak: localState.currentStreak || 0,
-                    longestStreak: localState.longestStreak || 0,
-                    lastCheckIn: localState.lastCheckIn || null,
-                    focusMode: localState.focusMode || false
+                QuitApp.setState({
+                    currentStreak: cloudData.currentStreak || 0,
+                    longestStreak: cloudData.longestStreak || 0,
+                    lastCheckIn: cloudData.lastCheckIn || null,
+                    focusMode: cloudData.focusMode || false
                 });
+            } else {
+                // No cloud data — fresh account, start at zero
+                var freshState = {
+                    currentStreak: 0,
+                    longestStreak: 0,
+                    lastCheckIn: null,
+                    focusMode: false
+                };
+                // Save fresh state to cloud
+                docRef.set(freshState);
+                QuitApp.setState(freshState);
             }
-        }).catch(function (error) {
-            console.warn('Cloud sync initial read failed:', error);
-        });
 
-        // Real-time listener — update local state when cloud changes
+            // Now start real-time listener for ongoing changes
+            startRealtimeSync(uid);
+        }).catch(function (error) {
+            console.warn('Cloud data load failed:', error);
+            // Still start listener in case it was a transient error
+            startRealtimeSync(uid);
+        });
+    }
+
+
+    // ---- Real-time Sync ----
+
+    /**
+     * Listen for changes from other devices and update this one.
+     */
+    function startRealtimeSync(uid) {
+        // Clean up any existing listener
+        stopCloudSync();
+
+        var docRef = db.collection('users').doc(uid);
+
         unsubscribe = docRef.onSnapshot(function (doc) {
-            if (doc.exists) {
+            if (doc.exists && doc.metadata.hasPendingWrites === false) {
+                // Only update from server-confirmed data (not local writes)
                 var cloudData = doc.data();
                 QuitApp.setState({
                     currentStreak: cloudData.currentStreak || 0,
@@ -171,32 +198,25 @@
         }
     }
 
+
+    // ---- Push to Cloud ----
+
     /**
      * Push current state to Firestore.
-     * Called by app.js after check-in or relapse.
+     * Called by app.js after check-in, relapse, or focus toggle.
      */
     function syncToCloud() {
-        var user = auth.currentUser;
-        if (!user) return;
+        if (!currentUID) return; // Not signed in
 
         var state = QuitApp.getState();
-        db.collection('users').doc(user.uid).set({
+        db.collection('users').doc(currentUID).set({
             currentStreak: state.currentStreak,
             longestStreak: state.longestStreak,
             lastCheckIn: state.lastCheckIn,
             focusMode: state.focusMode
-        }, { merge: true }).catch(function (error) {
+        }).catch(function (error) {
             console.warn('Cloud sync write failed:', error);
         });
-    }
-
-    /**
-     * Pick the latest (most recent) date string, or whichever is non-null.
-     */
-    function pickLatestDate(a, b) {
-        if (!a) return b || null;
-        if (!b) return a;
-        return a > b ? a : b;
     }
 
 
