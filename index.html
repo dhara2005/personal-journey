@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Quit Addiction — A calming daily streak tracker to help you stay strong, one day at a time." />
+  <meta name="theme-color" content="#2d6a5a" />
+  <title>Quit Addiction — Stay Strong</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===== Daily Progress Bar (top edge) ===== -->
+  <div class="progress-bar-track" id="progressTrack">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+
+  <main class="container" id="appContainer">
+
+    <!-- ===== Motivation Section ===== -->
+    <section class="motivation" id="motivationSection">
+      <h1 class="motivation__title">Why I'm Doing This</h1>
+      <ul class="motivation__list">
+        <li>To be a better father for my children</li>
+        <li>To build my confidence</li>
+        <li>To build my self esteem</li>
+        <li>To be able to approach people and not feel less of myself</li>
+      </ul>
+    </section>
+
+    <!-- ===== Streak Display ===== -->
+    <section class="streak" id="streakSection">
+      <div class="streak__current">
+        <span class="streak__number" id="currentStreak">0</span>
+        <span class="streak__label">Day Streak</span>
+      </div>
+      <div class="streak__meta">
+        <div class="streak__meta-item">
+          <span class="streak__meta-value" id="longestStreak">0</span>
+          <span class="streak__meta-label">Longest Streak</span>
+        </div>
+        <div class="streak__meta-item">
+          <span class="streak__meta-value" id="lastCheckIn">—</span>
+          <span class="streak__meta-label">Last Check-in</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Encouragement Message ===== -->
+    <section class="encouragement" id="encouragementSection">
+      <p class="encouragement__text" id="encouragementText"></p>
+    </section>
+
+    <!-- ===== Action Buttons ===== -->
+    <section class="actions" id="actionsSection">
+      <button class="btn btn--primary" id="checkInBtn">
+        <span class="btn__icon">✦</span>
+        I Stayed Strong Today
+      </button>
+      <button class="btn btn--secondary" id="relapseBtn">
+        I Slipped
+      </button>
+    </section>
+
+    <!-- ===== Focus Mode Toggle ===== -->
+    <section class="focus-toggle" id="focusToggleSection">
+      <button class="btn btn--ghost" id="focusModeBtn">
+        <span class="focus-icon" id="focusIcon">🌙</span>
+        <span id="focusModeLabel">Focus Mode</span>
+      </button>
+    </section>
+
+  </main>
+
+  <!-- ===== Relapse Confirmation Modal ===== -->
+  <div class="modal-overlay" id="relapseModal">
+    <div class="modal">
+      <p class="modal__title">Are you sure?</p>
+      <p class="modal__body">It's okay to stumble. What matters is that you're still here.<br/>This will reset your current streak.</p>
+      <div class="modal__actions">
+        <button class="btn btn--modal-cancel" id="modalCancel">Go Back</button>
+        <button class="btn btn--modal-confirm" id="modalConfirm">Yes, Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
