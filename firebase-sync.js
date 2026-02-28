@@ -103,26 +103,22 @@
     });
 
     function signIn() {
-        console.log('[Sync] Starting sign-in, mobile:', isMobile());
+        console.log('[Sync] Starting sign-in...');
         var provider = new firebase.auth.GoogleAuthProvider();
 
-        if (isMobile()) {
-            // Redirect flow — more reliable on mobile browsers
-            auth.signInWithRedirect(provider);
-        } else {
-            // Popup flow on desktop
-            auth.signInWithPopup(provider).then(function (result) {
-                console.log('[Sync] Popup sign-in success:', result.user.email);
-            }).catch(function (error) {
-                console.error('[Sync] Popup error:', error.code, error.message);
-                if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
-                    // Fall back to redirect
-                    auth.signInWithRedirect(provider);
-                } else {
-                    showStatus('Sign-in failed: ' + error.code, 'error');
-                }
-            });
-        }
+        // Use popup on all platforms — redirect was failing on mobile
+        auth.signInWithPopup(provider).then(function (result) {
+            console.log('[Sync] Sign-in success:', result.user.email);
+        }).catch(function (error) {
+            console.error('[Sync] Sign-in error:', error.code, error.message);
+            if (error.code === 'auth/popup-blocked') {
+                // Last resort: try redirect if popup is blocked
+                console.log('[Sync] Popup blocked, trying redirect...');
+                auth.signInWithRedirect(provider);
+            } else if (error.code !== 'auth/popup-closed-by-user') {
+                showStatus('Sign-in failed: ' + error.code, 'error');
+            }
+        });
     }
 
     function signOut() {
