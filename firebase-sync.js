@@ -41,6 +41,7 @@
     var userAvatar = document.getElementById('userAvatar');
     var userName = document.getElementById('userName');
     var authSection = document.getElementById('authSection');
+    var syncStatus = document.getElementById('syncStatus');
 
 
     // ---- Track current signed-in user ----
@@ -49,17 +50,40 @@
     var unsubscribe = null; // Firestore listener cleanup
 
 
+    // ---- Sync Status Indicator ----
+
+    function showSyncStatus(text, type) {
+        // type: 'success', 'error', 'loading'
+        syncStatus.textContent = text;
+        syncStatus.className = 'auth__sync-status sync-' + type;
+        syncStatus.style.display = 'inline';
+
+        // Auto-hide success messages after 3s
+        if (type === 'success') {
+            setTimeout(function () {
+                syncStatus.style.display = 'none';
+            }, 3000);
+        }
+    }
+
+    function hideSyncStatus() {
+        syncStatus.style.display = 'none';
+    }
+
+
     // ---- Auth State Listener ----
 
     auth.onAuthStateChanged(function (user) {
         if (user) {
             currentUID = user.uid;
             showSignedInUI(user);
+            showSyncStatus('Syncing...', 'loading');
             loadCloudData(user.uid);
         } else {
             currentUID = null;
             showSignedOutUI();
             stopCloudSync();
+            hideSyncStatus();
             // Reset to default empty state when signed out
             QuitApp.setState({
                 currentStreak: 0,
@@ -76,10 +100,11 @@
     function signInWithGoogle() {
         var provider = new firebase.auth.GoogleAuthProvider();
         auth.signInWithPopup(provider).catch(function (error) {
-            console.error('Sign-in error:', error);
-            // If popup blocked, fall back to redirect
+            console.error('Sign-in error:', error.code, error.message);
             if (error.code === 'auth/popup-blocked') {
                 auth.signInWithRedirect(provider);
+            } else {
+                showSyncStatus('Sign-in failed: ' + error.message, 'error');
             }
         });
     }
@@ -125,15 +150,14 @@
 
     /**
      * Load data from Firestore for this specific user.
-     * Does NOT merge localStorage — each account is fully isolated.
-     * If no cloud data exists, start fresh with zeroes.
+     * Each account is fully isolated — no localStorage merge.
+     * If cloud data exists, load it. Otherwise start fresh.
      */
     function loadCloudData(uid) {
         var docRef = db.collection('users').doc(uid);
 
         docRef.get().then(function (doc) {
             if (doc.exists) {
-                // Cloud data found — use it (overrides whatever is local)
                 var cloudData = doc.data();
                 QuitApp.setState({
                     currentStreak: cloudData.currentStreak || 0,
@@ -141,24 +165,29 @@
                     lastCheckIn: cloudData.lastCheckIn || null,
                     focusMode: cloudData.focusMode || false
                 });
+                showSyncStatus('✓ Synced', 'success');
             } else {
-                // No cloud data — fresh account, start at zero
+                // Brand new account — start at zero and save to cloud
                 var freshState = {
                     currentStreak: 0,
                     longestStreak: 0,
                     lastCheckIn: null,
                     focusMode: false
                 };
-                // Save fresh state to cloud
-                docRef.set(freshState);
+                docRef.set(freshState).then(function () {
+                    showSyncStatus('✓ Synced', 'success');
+                }).catch(function (error) {
+                    console.error('Cloud write failed:', error.code, error.message);
+                    showSyncStatus('✗ Sync failed — check Firestore rules', 'error');
+                });
                 QuitApp.setState(freshState);
             }
 
-            // Now start real-time listener for ongoing changes
+            // Now start real-time listener for ongoing changes from other devices
             startRealtimeSync(uid);
         }).catch(function (error) {
-            console.warn('Cloud data load failed:', error);
-            // Still start listener in case it was a transient error
+            console.error('Cloud read failed:', error.code, error.message);
+            showSyncStatus('✗ Sync failed — check Firestore rules', 'error');
             startRealtimeSync(uid);
         });
     }
@@ -167,17 +196,16 @@
     // ---- Real-time Sync ----
 
     /**
-     * Listen for changes from other devices and update this one.
+     * Listen for changes pushed from other devices.
      */
     function startRealtimeSync(uid) {
-        // Clean up any existing listener
         stopCloudSync();
 
         var docRef = db.collection('users').doc(uid);
 
         unsubscribe = docRef.onSnapshot(function (doc) {
             if (doc.exists && doc.metadata.hasPendingWrites === false) {
-                // Only update from server-confirmed data (not local writes)
+                // Only update from server-confirmed writes (ignore local echoes)
                 var cloudData = doc.data();
                 QuitApp.setState({
                     currentStreak: cloudData.currentStreak || 0,
@@ -187,7 +215,8 @@
                 });
             }
         }, function (error) {
-            console.warn('Cloud sync listener error:', error);
+            console.error('Realtime listener error:', error.code, error.message);
+            showSyncStatus('✗ Sync lost — check connection', 'error');
         });
     }
 
@@ -206,7 +235,7 @@
      * Called by app.js after check-in, relapse, or focus toggle.
      */
     function syncToCloud() {
-        if (!currentUID) return; // Not signed in
+        if (!currentUID) return;
 
         var state = QuitApp.getState();
         db.collection('users').doc(currentUID).set({
@@ -214,8 +243,11 @@
             longestStreak: state.longestStreak,
             lastCheckIn: state.lastCheckIn,
             focusMode: state.focusMode
+        }).then(function () {
+            showSyncStatus('✓ Synced', 'success');
         }).catch(function (error) {
-            console.warn('Cloud sync write failed:', error);
+            console.error('Cloud write failed:', error.code, error.message);
+            showSyncStatus('✗ Save failed — check Firestore rules', 'error');
         });
     }
 

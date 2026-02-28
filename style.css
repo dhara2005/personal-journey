@@ -370,6 +370,54 @@ body.focus-mode .btn--sign-out {
   color: var(--clr-focus-text-muted);
 }
 
+/* Sync status indicator */
+.auth__sync-status {
+  display: inline;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  width: 100%;
+  text-align: center;
+}
+
+.auth__sync-status.sync-success {
+  color: var(--clr-success);
+}
+
+.auth__sync-status.sync-error {
+  color: var(--clr-danger);
+}
+
+.auth__sync-status.sync-loading {
+  color: var(--clr-text-faint);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+body.focus-mode .auth__sync-status.sync-success {
+  color: var(--clr-accent);
+}
+
+body.focus-mode .auth__sync-status.sync-error {
+  color: var(--clr-danger);
+}
+
+body.focus-mode .auth__sync-status.sync-loading {
+  color: var(--clr-focus-text-muted);
+}
+
 
 /* ---------- Motivation Section ---------- */
 .motivation {
