@@ -104,19 +104,33 @@
 
     function signIn() {
         console.log('[Sync] Starting sign-in...');
+        showStatus('Opening sign-in...', 'loading');
         var provider = new firebase.auth.GoogleAuthProvider();
 
-        // Use popup on all platforms — redirect was failing on mobile
-        auth.signInWithPopup(provider).then(function (result) {
+        // Set persistence to LOCAL so session survives browser restarts
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(function () {
+            // Try popup first
+            return auth.signInWithPopup(provider);
+        }).then(function (result) {
             console.log('[Sync] Sign-in success:', result.user.email);
         }).catch(function (error) {
             console.error('[Sync] Sign-in error:', error.code, error.message);
-            if (error.code === 'auth/popup-blocked') {
-                // Last resort: try redirect if popup is blocked
-                console.log('[Sync] Popup blocked, trying redirect...');
+
+            if (error.code === 'auth/popup-blocked' ||
+                error.code === 'auth/cancelled-popup-request' ||
+                error.code === 'auth/operation-not-supported-in-this-environment') {
+                // Popup didn't work — try redirect
+                console.log('[Sync] Popup unavailable, using redirect...');
+                showStatus('Redirecting to sign-in...', 'loading');
                 auth.signInWithRedirect(provider);
-            } else if (error.code !== 'auth/popup-closed-by-user') {
-                showStatus('Sign-in failed: ' + error.code, 'error');
+            } else if (error.code === 'auth/popup-closed-by-user') {
+                showStatus('Sign-in cancelled', 'error');
+                setTimeout(function () { showStatus('', 'hidden'); }, 2000);
+            } else if (error.code === 'auth/unauthorized-domain') {
+                showStatus('✗ Domain not authorized in Firebase', 'error');
+            } else {
+                // Show the actual error so we can debug
+                showStatus('✗ ' + error.code + ': ' + error.message, 'error');
             }
         });
     }
