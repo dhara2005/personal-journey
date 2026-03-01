@@ -103,35 +103,16 @@
     });
 
     function signIn() {
-        console.log('[Sync] Starting sign-in...');
-        showStatus('Opening sign-in...', 'loading');
+        console.log('[Sync] Starting redirect sign-in...');
+        showStatus('Redirecting to Google...', 'loading');
         var provider = new firebase.auth.GoogleAuthProvider();
 
-        // Set persistence to LOCAL so session survives browser restarts
+        // Use redirect flow — works without popups on all browsers
         auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(function () {
-            // Try popup first
-            return auth.signInWithPopup(provider);
-        }).then(function (result) {
-            console.log('[Sync] Sign-in success:', result.user.email);
+            return auth.signInWithRedirect(provider);
         }).catch(function (error) {
             console.error('[Sync] Sign-in error:', error.code, error.message);
-
-            if (error.code === 'auth/popup-blocked' ||
-                error.code === 'auth/cancelled-popup-request' ||
-                error.code === 'auth/operation-not-supported-in-this-environment') {
-                // Popup didn't work — try redirect
-                console.log('[Sync] Popup unavailable, using redirect...');
-                showStatus('Redirecting to sign-in...', 'loading');
-                auth.signInWithRedirect(provider);
-            } else if (error.code === 'auth/popup-closed-by-user') {
-                showStatus('Sign-in cancelled', 'error');
-                setTimeout(function () { showStatus('', 'hidden'); }, 2000);
-            } else if (error.code === 'auth/unauthorized-domain') {
-                showStatus('✗ Domain not authorized in Firebase', 'error');
-            } else {
-                // Show the actual error so we can debug
-                showStatus('✗ ' + error.code + ': ' + error.message, 'error');
-            }
+            showStatus('✗ ' + error.code, 'error');
         });
     }
 
