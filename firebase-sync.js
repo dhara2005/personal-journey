@@ -156,6 +156,7 @@
         userName.textContent = 'Hi, ' + name;
         userName.style.display = 'block';
         authSection.classList.add('signed-in');
+        document.body.classList.add('signed-in');
     }
 
     function showSignedOutUI() {
@@ -164,6 +165,7 @@
         userAvatar.style.display = 'none';
         userName.style.display = 'none';
         authSection.classList.remove('signed-in');
+        document.body.classList.remove('signed-in');
         showStatus('', 'hidden');
         if (syncStatus) syncStatus.style.display = 'none';
     }

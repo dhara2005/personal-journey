@@ -932,6 +932,17 @@ body::after {
 }
 
 
+/* ---------- Signed-Out Gate ---------- */
+/* Hide all content sections until the user signs in */
+body:not(.signed-in) .motivation,
+body:not(.signed-in) .streak,
+body:not(.signed-in) .encouragement,
+body:not(.signed-in) .actions,
+body:not(.signed-in) .focus-toggle {
+  display: none;
+}
+
+
 /* ---------- Focus Mode ---------- */
 body.focus-mode .motivation,
 body.focus-mode .encouragement,
