@@ -103,32 +103,14 @@
     });
 
     function signIn() {
-        console.log('[Sync] Starting sign-in...');
-        showStatus('Signing in...', 'loading');
+        console.log('[Sync v5] Starting redirect sign-in...');
+        showStatus('Redirecting to Google...', 'loading');
         var provider = new firebase.auth.GoogleAuthProvider();
 
-        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(function () {
-            // Try popup first (works on desktop and some mobile browsers)
-            return auth.signInWithPopup(provider);
-        }).then(function (result) {
-            console.log('[Sync] Popup sign-in success:', result.user.email);
-        }).catch(function (error) {
-            console.error('[Sync] Popup error:', error.code, error.message);
-
-            // If popup was blocked or unsupported, try redirect
-            if (error.code === 'auth/popup-blocked' ||
-                error.code === 'auth/cancelled-popup-request' ||
-                error.code === 'auth/operation-not-supported-in-this-environment') {
-                console.log('[Sync] Trying redirect...');
-                showStatus('Redirecting...', 'loading');
-                auth.signInWithRedirect(provider);
-            } else if (error.code !== 'auth/popup-closed-by-user') {
-                // Show error visibly on page for debugging
-                showStatus('✗ ' + error.code, 'error');
-                // Also show a big visible error so user can report it
-                signInBtn.textContent = 'Retry sign-in';
-                signInBtn.style.display = 'inline-flex';
-            }
+        // REDIRECT ONLY — no popups, no blockers
+        auth.signInWithRedirect(provider).catch(function (error) {
+            console.error('[Sync v5] Redirect error:', error.code, error.message);
+            showStatus('✗ ' + error.code + ' — ' + error.message, 'error');
         });
     }
 
