@@ -13,7 +13,7 @@
 
     var firebaseConfig = {
         apiKey: "AIzaSyCtKj4LV8qoe7WBV-EHFLXbX70zrzX7otU",
-        authDomain: "personal-journey-tau.vercel.app",
+        authDomain: "quit-addiction-b9825.firebaseapp.com",
         projectId: "quit-addiction-b9825",
         storageBucket: "quit-addiction-b9825.firebasestorage.app",
         messagingSenderId: "716341836765",
@@ -103,16 +103,32 @@
     });
 
     function signIn() {
-        console.log('[Sync] Starting redirect sign-in...');
-        showStatus('Redirecting to Google...', 'loading');
+        console.log('[Sync] Starting sign-in...');
+        showStatus('Signing in...', 'loading');
         var provider = new firebase.auth.GoogleAuthProvider();
 
-        // Use redirect flow — works without popups on all browsers
         auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(function () {
-            return auth.signInWithRedirect(provider);
+            // Try popup first (works on desktop and some mobile browsers)
+            return auth.signInWithPopup(provider);
+        }).then(function (result) {
+            console.log('[Sync] Popup sign-in success:', result.user.email);
         }).catch(function (error) {
-            console.error('[Sync] Sign-in error:', error.code, error.message);
-            showStatus('✗ ' + error.code, 'error');
+            console.error('[Sync] Popup error:', error.code, error.message);
+
+            // If popup was blocked or unsupported, try redirect
+            if (error.code === 'auth/popup-blocked' ||
+                error.code === 'auth/cancelled-popup-request' ||
+                error.code === 'auth/operation-not-supported-in-this-environment') {
+                console.log('[Sync] Trying redirect...');
+                showStatus('Redirecting...', 'loading');
+                auth.signInWithRedirect(provider);
+            } else if (error.code !== 'auth/popup-closed-by-user') {
+                // Show error visibly on page for debugging
+                showStatus('✗ ' + error.code, 'error');
+                // Also show a big visible error so user can report it
+                signInBtn.textContent = 'Retry sign-in';
+                signInBtn.style.display = 'inline-flex';
+            }
         });
     }
 
