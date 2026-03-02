@@ -13,7 +13,7 @@
 
     var firebaseConfig = {
         apiKey: "AIzaSyCtKj4LV8qoe7WBV-EHFLXbX70zrzX7otU",
-        authDomain: "quit-addiction-b9825.firebaseapp.com",
+        authDomain: "personal-journey-tau.vercel.app",
         projectId: "quit-addiction-b9825",
         storageBucket: "quit-addiction-b9825.firebasestorage.app",
         messagingSenderId: "716341836765",
