@@ -106,6 +106,7 @@
         console.log('[Sync v5] Starting redirect sign-in...');
         showStatus('Redirecting to Google...', 'loading');
         var provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
 
         // REDIRECT ONLY — no popups, no blockers
         auth.signInWithRedirect(provider).catch(function (error) {
