@@ -1,0 +1,18 @@
+{
+    "name": "Quit Addiction — Stay Strong",
+    "short_name": "Quit Addiction",
+    "description": "A calming daily streak tracker to help you stay strong, one day at a time.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f1a16",
+    "theme_color": "#2d8b70",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
